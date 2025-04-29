@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from app.db import get_db
-from app.models import User
-from app.schema import usercreate,userLogin
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_
+from app.db.db import get_db
+from app.model.v1.usermodels import User
+from app.schema.v1.userSchema import usercreate,userLogin
 from app.utilities.auth import hash_password ,verify_password ,create_access_token
 
 router = APIRouter(
@@ -11,11 +12,11 @@ router = APIRouter(
 )
 
 @router.post('/signup')
-def create_user(user: usercreate, db: Session = Depends(get_db)):
-    userExist = db.query(User).filter(
-        (User.email == user.email) | (User.mobile == user.mobile)
-    ).first()
-
+async def create_user(user: usercreate, db: AsyncSession = Depends(get_db)):
+   
+    stmt = select(User).where(or_(User.email==user.email,User.mobile==user.mobile))
+    result = await db.execute(stmt)
+    userExist = result.scalar_one_or_none()
     if userExist:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="User with this Email or Phone already exists")
@@ -29,19 +30,21 @@ def create_user(user: usercreate, db: Session = Depends(get_db)):
         mobile=user.mobile
     )
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    await db.commit()
+    await db.refresh(new_user)
     return new_user
 
 @router.post('/login')
+async def loginuser(user: userLogin, db: AsyncSession = Depends(get_db)):
+    stmt = select(User).where(User.email == user.email)
+    result = await db.execute(stmt)  # <-- FIX: Add await here
+    db_user = result.scalar_one_or_none()
 
-def loginuser(user:userLogin,db:Session=Depends(get_db)):
+    if db_user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     
-    db_user = db.query(User).filter(user.email==User.email).first()
-    
-    if not db_user or not verify_password(user.password,db_user.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="invalid credentials")
+    if not verify_password(user.password, db_user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     token = create_access_token(data={"sub": db_user.email})
-    
-    return {"accessToken":token,"token_type":"bearer"}
+    return {"accessToken": token, "token_type": "bearer"}
