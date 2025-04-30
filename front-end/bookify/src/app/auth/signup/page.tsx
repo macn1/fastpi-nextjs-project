@@ -18,7 +18,7 @@ export default function Login() {
 
       </div>
 
-      {/* Right Section - Form */}
+      
       <div className="bg-lime-50 p-10 md:w-1/2 flex flex-col justify-center">
         <h2 className="text-2xl font-semibold mb-6 text-black">
           Create Account
