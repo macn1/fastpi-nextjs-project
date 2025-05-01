@@ -1,5 +1,6 @@
 from sqlalchemy import String,Integer,Column,Float,DateTime
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.db.db import Base
 
 class Book(Base):
@@ -17,3 +18,5 @@ class Book(Base):
     cover_image = Column(String, nullable=True)
     created = Column(DateTime(timezone=True), server_default=func.now())
     updated = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    cart_items = relationship("Cartitem", back_populates="book")
